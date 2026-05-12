@@ -57,6 +57,13 @@
         .btn-copy { background: #10b981; color: white; padding: 6px 14px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; }
         .btn-copy:hover { background: #059669; }
         .btn-sm { padding: 8px 16px; font-size: 13px; }
+        .btn-fetch {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white; padding: 10px 20px; font-size: 13px; border-radius: 8px;
+            border: none; cursor: pointer; white-space: nowrap; font-weight: 600;
+        }
+        .btn-fetch:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245,158,11,0.4); }
+        .btn-fetch:disabled { opacity: 0.6; cursor: not-allowed; }
         .comment-item {
             background: #fafbfc; border: 1px solid #eef0f2; border-radius: 10px;
             padding: 14px 18px; margin-bottom: 10px; position: relative; transition: box-shadow 0.2s;
@@ -89,6 +96,12 @@
             border-radius: 50%; animation: spin 0.8s linear infinite;
             margin-right: 8px; vertical-align: middle;
         }
+        .loading-spinner-dark {
+            display: inline-block; width: 14px; height: 14px;
+            border: 2px solid rgba(0,0,0,0.1); border-top-color: #f59e0b;
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+            margin-right: 6px; vertical-align: middle;
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
         .config-section { border-top: 1px solid #eee; padding-top: 16px; margin-top: 16px; }
         .config-section summary { cursor: pointer; font-size: 13px; color: #667eea; font-weight: 500; }
@@ -106,8 +119,36 @@
             text-align: center; color: rgba(255,255,255,0.6); font-size: 12px;
             padding: 20px 0; margin-top: 10px;
         }
+        /* 链接输入区域样式 */
+        .url-input-row {
+            display: flex; gap: 10px; align-items: stretch;
+        }
+        .url-input-row input { flex: 1; }
+        .fetch-status {
+            font-size: 12px; margin-top: 6px; padding: 6px 10px;
+            border-radius: 6px; display: none;
+        }
+        .fetch-status.fetching { display: block; background: #fef3c7; color: #92400e; }
+        .fetch-status.success { display: block; background: #d4edda; color: #155724; }
+        .fetch-status.error { display: block; background: #f8d7da; color: #721c24; }
+        .fetch-status.info { display: block; background: #e8f4fd; color: #0c4a6e; }
+        .divider {
+            display: flex; align-items: center; margin: 12px 0; color: #999; font-size: 12px;
+        }
+        .divider::before, .divider::after {
+            content: ''; flex: 1; border-top: 1px dashed #ddd;
+        }
+        .divider span { padding: 0 12px; }
+        .article-preview {
+            background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;
+            padding: 12px 16px; margin-top: 8px; font-size: 13px; display: none;
+        }
+        .article-preview .preview-title { font-weight: 600; color: #166534; margin-bottom: 4px; }
+        .article-preview .preview-content { color: #15803d; line-height: 1.5; max-height: 80px; overflow: hidden; }
+        .article-preview .preview-source { color: #16a34a; font-size: 11px; margin-top: 4px; }
         @media (max-width: 768px) {
             .form-row { grid-template-columns: 1fr; }
+            .url-input-row { flex-direction: column; }
             body { padding: 12px; }
             .card { padding: 18px; }
             .header h1 { font-size: 22px; }
@@ -118,7 +159,7 @@
     <div class="container">
         <div class="header">
             <h1>📝 评论运营助手</h1>
-            <p>输入文章标题/正文 → 一键生成拟人化评论 | 团队在线版</p>
+            <p>粘贴文章链接 → 自动提取正文 → 一键生成拟人化评论 | 团队在线版</p>
         </div>
 
         <div class="notice-bar">
@@ -131,6 +172,23 @@
         <div class="card" id="input-card">
             <h2>一键生成评论</h2>
             
+            <!-- 文章链接输入（新增） -->
+            <div class="form-group">
+                <label>🔗 文章链接（粘贴后自动提取标题和正文）</label>
+                <div class="url-input-row">
+                    <input type="text" id="article-url" placeholder="粘贴文章链接，如：https://view.inews.qq.com/a/20260511A03AS800">
+                    <button class="btn-fetch" id="fetch-btn" onclick="fetchArticle()">📥 提取文章</button>
+                </div>
+                <div class="fetch-status" id="fetch-status"></div>
+                <div class="article-preview" id="article-preview">
+                    <div class="preview-title" id="preview-title"></div>
+                    <div class="preview-content" id="preview-content"></div>
+                    <div class="preview-source" id="preview-source"></div>
+                </div>
+            </div>
+
+            <div class="divider"><span>或者手动输入 ↓</span></div>
+
             <div class="form-group">
                 <label>📰 文章标题（必填）</label>
                 <input type="text" id="article-title" placeholder="粘贴文章标题，如：暴雨致多地受灾 各地全力抢险救灾">
@@ -259,7 +317,7 @@
         </div>
 
         <div class="footer">
-            评论运营助手 · 团队在线版 · API Key 仅存储在你的浏览器本地，安全可靠
+            评论运营助手 · 团队在线版 · 支持腾讯新闻/头条/微博/澎湃/网易等平台自动提取
         </div>
     </div>
 
@@ -267,6 +325,7 @@
         let parsedComments = [];
         let selectedTones = [];
         let isGenerating = false;
+        let isFetching = false;
 
         // ========== 配置管理（localStorage） ==========
         const CONFIG_KEY = 'comment_assistant_config';
@@ -308,8 +367,24 @@
                 showStatus('👋 首次使用请先在下方配置 API Key，然后就可以生成评论了！', 'info');
             }
 
+            // 回车快捷键
             document.getElementById('article-title').addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') { e.preventDefault(); oneClickGenerate(); }
+            });
+
+            // 链接输入框回车触发提取
+            document.getElementById('article-url').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); fetchArticle(); }
+            });
+
+            // 链接粘贴自动触发提取
+            document.getElementById('article-url').addEventListener('paste', () => {
+                setTimeout(() => {
+                    const url = document.getElementById('article-url').value.trim();
+                    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+                        fetchArticle();
+                    }
+                }, 100);
             });
 
             document.querySelectorAll('.tone-tag').forEach(tag => {
@@ -324,6 +399,281 @@
                 });
             });
         });
+
+        // ========== 文章抓取（核心新功能） ==========
+
+        // 从URL中提取腾讯新闻文章ID
+        function extractQQArticleId(url) {
+            const match = url.match(/\/a\/(\w+)/);
+            if (match) return match[1];
+            const parts = url.replace(/\/+$/, '').split('/');
+            const candidate = parts[parts.length - 1];
+            if (/^\d{8}\w+$/.test(candidate)) return candidate;
+            return null;
+        }
+
+        // 清理HTML标签
+        function cleanHtml(text) {
+            if (!text) return '';
+            text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+            text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+            text = text.replace(/<!--(VIDEO|IMG|AD|AIPOS)_\d+-->/g, '');
+            text = text.replace(/<br\s*\/?>/gi, '\n');
+            text = text.replace(/<\/p>/gi, '\n');
+            text = text.replace(/<[^>]+>/g, '');
+            text = text.replace(/&nbsp;/g, ' ');
+            text = text.replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+            text = text.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+            text = text.replace(/&#\d+;/g, '');
+            text = text.replace(/&\w+;/g, '');
+            text = text.replace(/[ \t]+/g, ' ');
+            text = text.replace(/\n{3,}/g, '\n\n');
+            return text.trim();
+        }
+
+        // 从HTML中提取文章信息
+        function extractFromHtml(html, url) {
+            let title = '', content = '', source = '网页';
+
+            // 判断平台
+            if (url.includes('qq.com')) {
+                source = '腾讯新闻';
+                // window.DATA
+                const dataMatch = html.match(/window\.DATA\s*=\s*(\{[\s\S]*?\});/);
+                if (dataMatch) {
+                    try {
+                        const d = JSON.parse(dataMatch[1]);
+                        if (d.title) title = d.title;
+                        if (d.content) content = cleanHtml(d.content);
+                    } catch(e) {}
+                }
+                // __INITIAL_DATA__
+                if (!title) {
+                    const initMatch = html.match(/window\.__INITIAL_DATA__\s*=\s*(\{[\s\S]*?\});/);
+                    if (initMatch) {
+                        try {
+                            const d = JSON.parse(initMatch[1]);
+                            if (d.title) title = d.title;
+                            if (!content && d.content) content = cleanHtml(d.content);
+                        } catch(e) {}
+                    }
+                }
+            } else if (url.includes('thepaper.cn')) {
+                source = '澎湃新闻';
+            } else if (url.includes('163.com')) {
+                source = '网易新闻';
+            } else if (url.includes('toutiao') || url.includes('today')) {
+                source = '今日头条';
+            } else if (url.includes('weibo')) {
+                source = '微博';
+            }
+
+            // JSON-LD
+            if (!title || !content) {
+                const ldMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/);
+                if (ldMatch) {
+                    try {
+                        let ld = JSON.parse(ldMatch[1]);
+                        if (Array.isArray(ld)) ld = ld[0] || {};
+                        if (!title && ld.headline) title = ld.headline;
+                        if (!content && ld.articleBody) content = ld.articleBody;
+                    } catch(e) {}
+                }
+            }
+
+            // og:title
+            if (!title) {
+                const ogMatch = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]*)"/);
+                if (ogMatch) title = ogMatch[1];
+            }
+
+            // h1
+            if (!title) {
+                const h1Match = html.match(/<h1[^>]*>(.*?)<\/h1>/s);
+                if (h1Match) title = cleanHtml(h1Match[1]);
+            }
+
+            // title标签
+            if (!title) {
+                const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/s);
+                if (titleMatch) {
+                    title = cleanHtml(titleMatch[1]).split(/[-_|—]/)[0].trim();
+                }
+            }
+
+            // 正文 - 多种容器
+            if (!content) {
+                const selectors = [
+                    /<article[^>]*>([\s\S]*?)<\/article>/,
+                    /class="content-article[^"]*"[^>]*>([\s\S]*?)<\/div>/,
+                    /class="article-content[^"]*"[^>]*>([\s\S]*?)<\/div>/,
+                    /class="post_body"[^>]*>([\s\S]*?)<\/div>/,
+                    /id="content"[^>]*>([\s\S]*?)<\/div>/,
+                    /class="news_txt[^"]*"[^>]*>([\s\S]*?)<\/div>/,
+                    /class="entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>/,
+                ];
+                for (const sel of selectors) {
+                    const m = html.match(sel);
+                    if (m) {
+                        const t = cleanHtml(m[1]);
+                        if (t.length > 80) { content = t; break; }
+                    }
+                }
+            }
+
+            // p标签聚合
+            if (!content) {
+                const ps = [...html.matchAll(/<p[^>]*>(.*?)<\/p>/gs)];
+                const texts = ps.map(m => cleanHtml(m[1])).filter(t => t.length > 15);
+                if (texts.length > 0) content = texts.join('\n');
+            }
+
+            // meta description
+            if (!content) {
+                const descMatch = html.match(/<meta[^>]*(?:name="description"|property="og:description")[^>]*content="([^"]*)"/);
+                if (descMatch) content = descMatch[1];
+            }
+
+            return { title, content, source };
+        }
+
+        // 主抓取函数 - 多策略降级
+        async function fetchArticle() {
+            if (isFetching) return;
+            
+            const url = document.getElementById('article-url').value.trim();
+            if (!url) {
+                setFetchStatus('请输入文章链接', 'error');
+                return;
+            }
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                setFetchStatus('链接格式不正确，需要以 http:// 或 https:// 开头', 'error');
+                return;
+            }
+
+            isFetching = true;
+            const btn = document.getElementById('fetch-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner-dark"></span>提取中...';
+            setFetchStatus('⏳ 正在提取文章内容，请稍候...', 'fetching');
+            hidePreview();
+
+            let title = '', content = '', source = '';
+            let success = false;
+
+            // ===== 策略1：腾讯新闻直连API（不需要CORS代理） =====
+            if (url.includes('qq.com')) {
+                const articleId = extractQQArticleId(url);
+                if (articleId) {
+                    try {
+                        setFetchStatus('⏳ 正在通过腾讯新闻API提取...', 'fetching');
+                        const apiUrl = `https://r.inews.qq.com/getSimpleNews?id=${articleId}`;
+                        const resp = await fetch(apiUrl, {
+                            headers: { 'Accept': 'application/json' },
+                            signal: AbortSignal.timeout(10000)
+                        });
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            if (data.title) title = data.title;
+                            if (data.content && data.content.text) {
+                                content = cleanHtml(data.content.text);
+                            }
+                            if (!content && data.abstract) {
+                                content = data.abstract;
+                            }
+                            source = '腾讯新闻';
+                            if (title && content && content.length > 30) {
+                                success = true;
+                            }
+                        }
+                    } catch(e) {
+                        console.log('腾讯API直连失败:', e.message);
+                    }
+                }
+            }
+
+            // ===== 策略2：通过多个CORS代理获取网页HTML =====
+            if (!success) {
+                const corsProxies = [
+                    (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+                    (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+                    (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+                ];
+
+                for (const proxyFn of corsProxies) {
+                    try {
+                        setFetchStatus('⏳ 正在通过代理提取文章内容...', 'fetching');
+                        const proxyUrl = proxyFn(url);
+                        const resp = await fetch(proxyUrl, {
+                            signal: AbortSignal.timeout(15000)
+                        });
+                        if (resp.ok) {
+                            const html = await resp.text();
+                            if (html && html.length > 200) {
+                                const extracted = extractFromHtml(html, url);
+                                if (extracted.title) title = extracted.title;
+                                if (extracted.content && extracted.content.length > 30) {
+                                    content = extracted.content;
+                                }
+                                source = extracted.source;
+                                if (title || (content && content.length > 50)) {
+                                    success = true;
+                                    break;
+                                }
+                            }
+                        }
+                    } catch(e) {
+                        console.log('CORS代理失败:', e.message);
+                        continue;
+                    }
+                }
+            }
+
+            // ===== 策略3：用AI模型联网理解（如果模型支持） =====
+            // SiliconFlow的模型不支持联网，跳过
+
+            // ===== 填充结果 =====
+            if (success && (title || content)) {
+                if (title) {
+                    document.getElementById('article-title').value = title;
+                }
+                if (content) {
+                    // 限制正文长度，太长了AI处理不了
+                    const maxLen = 3000;
+                    if (content.length > maxLen) {
+                        content = content.substring(0, maxLen) + '...（正文已截取前' + maxLen + '字）';
+                    }
+                    document.getElementById('article-content').value = content;
+                }
+
+                showPreview(title, content, source);
+                setFetchStatus(`✅ 提取成功！来源：${source}，标题${title ? '✓' : '✗'}，正文${content ? '✓ (' + content.length + '字)' : '✗'}`, 'success');
+            } else {
+                setFetchStatus('⚠️ 自动提取失败（可能是该网站不支持跨域访问）。请手动复制文章标题和正文到下方输入框。', 'error');
+            }
+
+            isFetching = false;
+            btn.disabled = false;
+            btn.innerHTML = '📥 提取文章';
+        }
+
+        function setFetchStatus(msg, type) {
+            const el = document.getElementById('fetch-status');
+            el.className = `fetch-status ${type}`;
+            el.innerHTML = msg;
+        }
+
+        function showPreview(title, content, source) {
+            const el = document.getElementById('article-preview');
+            document.getElementById('preview-title').textContent = title || '（未提取到标题）';
+            document.getElementById('preview-content').textContent = content ? content.substring(0, 200) + (content.length > 200 ? '...' : '') : '（未提取到正文）';
+            document.getElementById('preview-source').textContent = `来源: ${source || '未知'}`;
+            el.style.display = 'block';
+        }
+
+        function hidePreview() {
+            document.getElementById('article-preview').style.display = 'none';
+        }
 
         // ========== 系统Prompt ==========
         const SYSTEM_PROMPT = `你是一个资深互联网评论运营专家。你的任务是输出**有深度、有信息增量、拟人化**的高质量评论。
@@ -390,14 +740,22 @@
         async function oneClickGenerate() {
             if (isGenerating) return;
 
-            const title = document.getElementById('article-title').value.trim();
-            const content = document.getElementById('article-content').value.trim();
+            const urlInput = document.getElementById('article-url').value.trim();
+            let title = document.getElementById('article-title').value.trim();
+            let content = document.getElementById('article-content').value.trim();
             const category = document.getElementById('category').value;
             const count = document.getElementById('count').value;
             const requirements = document.getElementById('requirements').value.trim();
 
+            // 如果有链接但没有标题和正文，先尝试自动抓取
+            if (urlInput && !title && !content) {
+                await fetchArticle();
+                title = document.getElementById('article-title').value.trim();
+                content = document.getElementById('article-content').value.trim();
+            }
+
             if (!title && !content) {
-                showStatus('❌ 请输入文章标题（必填），正文可选填', 'error');
+                showStatus('❌ 请输入文章链接、标题或正文（至少填一项）', 'error');
                 return;
             }
 
