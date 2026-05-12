@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>评论运营助手 - 团队版</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1100px; margin: 0 auto; }
+        .header { text-align: center; color: white; padding: 30px 0 20px; }
+        .header h1 { font-size: 28px; margin-bottom: 8px; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .header p { font-size: 14px; opacity: 0.9; }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        }
+        .card h2 {
+            font-size: 18px; color: #333; margin-bottom: 18px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .card h2::before {
+            content: ''; display: inline-block; width: 4px; height: 20px;
+            background: linear-gradient(180deg, #667eea, #764ba2); border-radius: 2px;
+        }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 10px 14px; border: 1.5px solid #e0e0e0;
+            border-radius: 8px; font-size: 14px; transition: border-color 0.2s; outline: none;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+        .btn {
+            padding: 12px 28px; border: none; border-radius: 8px;
+            font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+        }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white; box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+        }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5); }
+        .btn-secondary { background: #f0f2f5; color: #333; }
+        .btn-secondary:hover:not(:disabled) { background: #e4e7ec; }
+        .btn-copy { background: #10b981; color: white; padding: 6px 14px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; }
+        .btn-copy:hover { background: #059669; }
+        .btn-sm { padding: 8px 16px; font-size: 13px; }
+        .comment-item {
+            background: #fafbfc; border: 1px solid #eef0f2; border-radius: 10px;
+            padding: 14px 18px; margin-bottom: 10px; position: relative; transition: box-shadow 0.2s;
+        }
+        .comment-item:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .comment-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12px; color: #999; }
+        .comment-persona { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+        .comment-angle { background: #e8f0fe; color: #1a56db; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+        .comment-type { background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+        .comment-text { font-size: 14px; line-height: 1.6; color: #333; }
+        .comment-actions { position: absolute; right: 14px; top: 14px; }
+        .tone-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .tone-tag {
+            padding: 5px 12px; border: 1.5px solid #e0e0e0; border-radius: 20px;
+            font-size: 12px; cursor: pointer; transition: all 0.2s; user-select: none;
+        }
+        .tone-tag.active { border-color: #667eea; background: rgba(102, 126, 234, 0.08); color: #667eea; font-weight: 500; }
+        .tone-tag:hover { border-color: #667eea; }
+        .hidden { display: none; }
+        .toolbar { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+        .result-count { font-size: 13px; color: #666; margin-bottom: 12px; }
+        .status-bar { padding: 14px 20px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; display: none; }
+        .status-bar.info { background: #e8f4fd; color: #0c4a6e; display: block; }
+        .status-bar.success { background: #d4edda; color: #155724; display: block; }
+        .status-bar.error { background: #f8d7da; color: #721c24; display: block; }
+        .status-bar.warning { background: #fff3cd; color: #856404; display: block; }
+        .loading-spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+            margin-right: 8px; vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .config-section { border-top: 1px solid #eee; padding-top: 16px; margin-top: 16px; }
+        .config-section summary { cursor: pointer; font-size: 13px; color: #667eea; font-weight: 500; }
+        .config-section summary:hover { color: #764ba2; }
+        .config-fields { margin-top: 12px; padding: 16px; background: #f8f9fa; border-radius: 8px; }
+        .config-fields .form-group { margin-bottom: 12px; }
+        .config-fields .form-group:last-child { margin-bottom: 0; }
+        .input-row { display: flex; gap: 10px; }
+        .input-row input { flex: 1; }
+        .notice-bar {
+            background: rgba(255,255,255,0.15); color: white; text-align: center;
+            padding: 8px; border-radius: 8px; margin-bottom: 16px; font-size: 13px;
+        }
+        .footer {
+            text-align: center; color: rgba(255,255,255,0.6); font-size: 12px;
+            padding: 20px 0; margin-top: 10px;
+        }
+        @media (max-width: 768px) {
+            .form-row { grid-template-columns: 1fr; }
+            body { padding: 12px; }
+            .card { padding: 18px; }
+            .header h1 { font-size: 22px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📝 评论运营助手</h1>
+            <p>输入文章标题/正文 → 一键生成拟人化评论 | 团队在线版</p>
+        </div>
+
+        <div class="notice-bar">
+            ✨ 在线版 — 打开链接即可使用，API Key 安全存储在你自己的浏览器中，不会上传到任何服务器
+        </div>
+
+        <div id="status-bar" class="status-bar"></div>
+
+        <!-- 主输入区 -->
+        <div class="card" id="input-card">
+            <h2>一键生成评论</h2>
+            
+            <div class="form-group">
+                <label>📰 文章标题（必填）</label>
+                <input type="text" id="article-title" placeholder="粘贴文章标题，如：暴雨致多地受灾 各地全力抢险救灾">
+            </div>
+
+            <div class="form-group">
+                <label>📄 文章正文（选填，填入后评论更精准）</label>
+                <textarea id="article-content" rows="4" placeholder="粘贴文章正文内容（可选，但建议填入关键段落以提升评论质量）"></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>文章垂类</label>
+                    <select id="category">
+                        <option value="通用">自动识别/通用</option>
+                        <option value="社会民生">社会民生</option>
+                        <option value="科技数码">科技数码</option>
+                        <option value="财经商业">财经商业</option>
+                        <option value="娱乐八卦">娱乐八卦</option>
+                        <option value="体育竞技">体育竞技</option>
+                        <option value="国际时事">国际时事</option>
+                        <option value="健康医疗">健康医疗</option>
+                        <option value="教育">教育</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>生成条数</label>
+                    <select id="count">
+                        <option value="5">5条</option>
+                        <option value="8">8条</option>
+                        <option value="10" selected>10条</option>
+                        <option value="15">15条</option>
+                        <option value="20">20条</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>补评要求</label>
+                    <input type="text" id="requirements" placeholder="如：多些幽默、正能量为主">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>评论基调偏好（可多选）</label>
+                <div class="tone-tags" id="tone-tags">
+                    <span class="tone-tag" data-tone="理性客观">理性客观</span>
+                    <span class="tone-tag" data-tone="感同身受">感同身受</span>
+                    <span class="tone-tag" data-tone="轻松幽默">轻松幽默</span>
+                    <span class="tone-tag" data-tone="正能量">正能量</span>
+                    <span class="tone-tag" data-tone="专业分析">专业分析</span>
+                    <span class="tone-tag" data-tone="吐槽犀利">吐槽犀利</span>
+                    <span class="tone-tag" data-tone="温情暖心">温情暖心</span>
+                    <span class="tone-tag" data-tone="反思深度">反思深度</span>
+                </div>
+            </div>
+
+            <div style="margin-top: 16px;">
+                <button class="btn btn-primary" id="generate-btn" onclick="oneClickGenerate()" style="width:100%;">
+                    🚀 一键生成评论
+                </button>
+            </div>
+
+            <!-- AI配置 -->
+            <details class="config-section" id="config-section">
+                <summary>🔑 AI模型配置（首次使用需设置API Key）</summary>
+                <div class="config-fields">
+                    <div class="form-group">
+                        <label>API服务商</label>
+                        <select id="api-preset" onchange="applyPreset()">
+                            <option value="siliconflow">硅基流动 SiliconFlow（免费注册）</option>
+                            <option value="deepseek">DeepSeek（价格便宜）</option>
+                            <option value="openai">OpenAI / ChatGPT</option>
+                            <option value="custom">自定义地址</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>API Base URL</label>
+                        <input type="text" id="api-base" value="https://api.siliconflow.cn/v1">
+                    </div>
+                    <div class="form-group">
+                        <label>API Key <span style="color:#e74c3c">*必填</span></label>
+                        <div class="input-row">
+                            <input type="password" id="api-key" placeholder="sk-xxxxx">
+                            <button class="btn btn-secondary btn-sm" onclick="toggleKeyVisibility()">👁️</button>
+                        </div>
+                        <div style="font-size:11px; color:#999; margin-top:4px;">
+                            硅基流动注册地址：<a href="https://cloud.siliconflow.cn" target="_blank">cloud.siliconflow.cn</a>（注册送免费额度）
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>模型名称</label>
+                        <input type="text" id="model-name" value="Qwen/Qwen2.5-7B-Instruct">
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="saveConfig()">💾 保存配置到浏览器</button>
+                    <span id="config-status" style="font-size:12px; margin-left:10px; color:#10b981;"></span>
+                </div>
+            </details>
+        </div>
+
+        <!-- 生成进度 -->
+        <div class="card hidden" id="progress-card">
+            <h2>⏳ AI正在生成评论...</h2>
+            <p style="color:#666; font-size:13px; margin-bottom:12px;">通常需要10-30秒，请耐心等待</p>
+            <div style="height:4px; background:#eee; border-radius:2px; overflow:hidden;">
+                <div id="progress-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#667eea,#764ba2); transition:width 0.5s; animation: loading 2s ease-in-out infinite;"></div>
+            </div>
+            <style>
+                @keyframes loading {
+                    0% { width: 10%; }
+                    50% { width: 70%; }
+                    100% { width: 90%; }
+                }
+            </style>
+        </div>
+
+        <!-- 评论结果 -->
+        <div class="card hidden" id="result-card">
+            <h2>✅ 生成结果</h2>
+            <div class="result-count" id="result-count"></div>
+            <div id="comments-list"></div>
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="copyAllComments()">📋 一键复制全部</button>
+                <button class="btn btn-secondary" onclick="copyCommentsOnly()">📝 仅复制评论文本</button>
+                <button class="btn btn-secondary" onclick="exportCSV()">📊 导出CSV</button>
+                <button class="btn btn-secondary" onclick="regenerate()">🔄 重新生成</button>
+            </div>
+        </div>
+
+        <div class="footer">
+            评论运营助手 · 团队在线版 · API Key 仅存储在你的浏览器本地，安全可靠
+        </div>
+    </div>
+
+    <script>
+        let parsedComments = [];
+        let selectedTones = [];
+        let isGenerating = false;
+
+        // ========== 配置管理（localStorage） ==========
+        const CONFIG_KEY = 'comment_assistant_config';
+
+        function getConfig() {
+            try {
+                const saved = localStorage.getItem(CONFIG_KEY);
+                if (saved) return JSON.parse(saved);
+            } catch(e) {}
+            return {
+                api_base: 'https://api.siliconflow.cn/v1',
+                api_key: '',
+                model: 'Qwen/Qwen2.5-7B-Instruct'
+            };
+        }
+
+        function setConfig(cfg) {
+            try { localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg)); } catch(e) {}
+        }
+
+        // ========== 初始化 ==========
+        document.addEventListener('DOMContentLoaded', () => {
+            const cfg = getConfig();
+            document.getElementById('api-base').value = cfg.api_base || 'https://api.siliconflow.cn/v1';
+            document.getElementById('api-key').value = cfg.api_key || '';
+            document.getElementById('model-name').value = cfg.model || 'Qwen/Qwen2.5-7B-Instruct';
+
+            if (cfg.api_base) {
+                for (const [key, preset] of Object.entries(PRESETS)) {
+                    if (cfg.api_base === preset.base) {
+                        document.getElementById('api-preset').value = key;
+                        break;
+                    }
+                }
+            }
+
+            if (!cfg.api_key) {
+                document.getElementById('config-section').open = true;
+                showStatus('👋 首次使用请先在下方配置 API Key，然后就可以生成评论了！', 'info');
+            }
+
+            document.getElementById('article-title').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); oneClickGenerate(); }
+            });
+
+            document.querySelectorAll('.tone-tag').forEach(tag => {
+                tag.addEventListener('click', () => {
+                    tag.classList.toggle('active');
+                    const tone = tag.dataset.tone;
+                    if (tag.classList.contains('active')) {
+                        selectedTones.push(tone);
+                    } else {
+                        selectedTones = selectedTones.filter(t => t !== tone);
+                    }
+                });
+            });
+        });
+
+        // ========== 系统Prompt ==========
+        const SYSTEM_PROMPT = `你是一个资深互联网评论运营专家。你的任务是输出**有深度、有信息增量、拟人化**的高质量评论。
+
+## 核心质量标准（优评5要素，缺一不可）
+
+1. **有信息增量**：必须包含具体数据/事实/法条/案例/行业知识，不能只是空洞表态
+2. **有逻辑链**：因为A→所以B→导致C，不能只抒情
+3. **长度适中**：每条100-300字（3-8句话），不能一句话水评，也不能超500字变文章
+4. **口语自然**：像聊天不像写报告，用"说白了""你想啊""我寻思"等口语化表达
+5. **角度独特**：每条评论切入点不同，不能10条都在说同一个观点
+
+## 评论类型分配（每批必须覆盖至少4种）
+
+- 理性讨论（占比40%）：有论点有论据，引用数据/事实支撑
+- 科普型（占比20%）：解释专业知识/背景/法规，让普通人看懂
+- 个人经历分享（占比20%）：第一人称讲故事，有细节有画面感
+- 玩梗/抖机灵（占比10%）：精辟短评、文字游戏、反讽、段子
+- 专业意见或建议（占比10%）：从从业者角度给出专业视角
+
+## 绝对禁止的表述（AI味道，出现即判定为不合格）
+
+- "值得关注""让我们拭目以待""不禁令人深思""综上所述"
+- "作为一个XX，我认为"（太刻意暴露人设）
+- "首先...其次...最后"工整并列
+- 过于工整的排比句
+- "不言而喻""毋庸置疑""显而易见"
+- 喊口号式的空洞正确废话
+- 开头用"我觉得""个人认为"（真人评论很少这么写）
+
+## 拟人化技巧
+
+- 可以有语气词：吧、啊、呢、嘛、哦、的说
+- 可以有口头禅："说白了""怎么说呢""我寻思""懂的都懂""你想啊"
+- 可以有省略号表达停顿、破折号表达转折
+- 可以有[吃瓜][捂脸][笑哭]等表情标签
+- 句子长短参差，不要每句都差不多长
+- 偶尔可以有不完整的句子（模拟打字打一半的感觉）
+
+## 优评标杆示例
+
+示例1-理性讨论："说白了，这事儿跟特朗普2026年能不能选上关系太大了，90天后关税是彻底取消还是接着升级，基本看他的大选命运。为啥呢？因为铁锈带的工厂、农业州的农民都指着这口气缓过来呢，不然选票就该跑了。"
+
+示例2-科普型："关税这东西，说白了就是加在进出口商品上的税，但最后几乎都是平民掏钱。以2025年4月生效的24%关税为例，美国家庭一年平均多支出大约1700美元，平时买的日用品、吃的喝的，只要是从中国进口的，商家进货成本就高了，最后肯定得涨价。"
+
+示例3-个人经历："忽然想起16年去美国的时候，遇到的一个流浪汉大叔。他是麻省理工学院的经济学正教授，老婆得了慢性白血病，最后老婆没了，自己因为医疗债务，落了个无家可归。"
+
+示例4-玩梗："可口可乐和百事可乐打架，非常可乐没了。王老吉和加多宝打架，和其正没了[吃瓜]"
+
+示例5-行业内幕："当过一段时间麦当劳店长，当时我们店里就有招的退休员工，有很重要的一点就是稳定，一般退休员工，会比社会兼职员工，更能安排好自己的时间，同时比社会兼职员工成本更低。"
+
+## 反面教材（绝对不能生成这种）
+
+❌ "搁这续季卡呢哈哈哈哈"（太短，无信息增量）
+❌ "支持国家政策，相信一切都会好的"（喊口号，空洞）
+❌ "值得关注，让我们拭目以待"（AI味满溢）
+❌ 超过500字的长篇大论
+❌ 10条评论都在说同一个角度
+
+## 输出格式要求
+严格按JSON数组输出，不要任何多余解释文字。`;
+
+        // ========== 核心：一键生成 ==========
+        async function oneClickGenerate() {
+            if (isGenerating) return;
+
+            const title = document.getElementById('article-title').value.trim();
+            const content = document.getElementById('article-content').value.trim();
+            const category = document.getElementById('category').value;
+            const count = document.getElementById('count').value;
+            const requirements = document.getElementById('requirements').value.trim();
+
+            if (!title && !content) {
+                showStatus('❌ 请输入文章标题（必填），正文可选填', 'error');
+                return;
+            }
+
+            const cfg = getConfig();
+            const apiKey = document.getElementById('api-key').value.trim() || cfg.api_key;
+            if (!apiKey) {
+                showStatus('⚠️ 请先在下方配置 API Key', 'warning');
+                document.getElementById('config-section').open = true;
+                return;
+            }
+
+            isGenerating = true;
+            const btn = document.getElementById('generate-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span>AI生成中，请稍候...';
+
+            document.getElementById('progress-card').classList.remove('hidden');
+            document.getElementById('result-card').classList.add('hidden');
+
+            try {
+                const contentPreview = content ? content.substring(0, 1200) : '（无正文）';
+                const toneStr = selectedTones.length > 0 ? `\n基调偏好：${selectedTones.join('、')}` : '';
+                const reqStr = requirements ? `\n特殊要求：${requirements}` : '';
+
+                const userPrompt = `为这篇文章生成${count}条高质量评论：
+
+标题：${title}
+正文：${contentPreview}
+垂类：${category}${toneStr}${reqStr}
+
+要求：
+1. ${count}条评论必须覆盖至少4种类型（理性讨论、科普、个人经历、玩梗、专业建议）
+2. 每条100-300字，有信息增量，有逻辑链
+3. 人设差异要大，像完全不同的人写的
+4. 玩梗/抖机灵类可以短一些（20-80字），但必须精辟有创意
+
+直接输出JSON数组：
+[{"comment":"评论内容","persona":"人设标签","angle":"评论角度","type":"评论类型(理性讨论/科普/个人经历分享/玩梗/专业意见或建议)"}]
+
+人设从这些中选：大叔型、学生党、职场白领、热心大妈、段子手、技术宅、小镇青年、情感博主、杠精型、吃瓜群众、行业从业者、退休老人
+
+只输出JSON，不要任何解释文字。`;
+
+                const apiBase = (document.getElementById('api-base').value.trim() || cfg.api_base).replace(/\/+$/, '');
+                const model = document.getElementById('model-name').value.trim() || cfg.model;
+
+                const response = await fetch(`${apiBase}/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [
+                            { role: 'system', content: SYSTEM_PROMPT },
+                            { role: 'user', content: userPrompt }
+                        ],
+                        temperature: 0.92,
+                        max_tokens: 8192
+                    }),
+                    signal: AbortSignal.timeout(120000)
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    if (response.status === 401) throw new Error('API Key无效或已过期，请检查配置');
+                    if (response.status === 429) throw new Error('请求过于频繁，请稍后重试');
+                    if (response.status === 402) throw new Error('API额度不足，请充值或更换Key');
+                    throw new Error(`API请求失败(${response.status}): ${errData.error?.message || JSON.stringify(errData).substring(0, 200)}`);
+                }
+
+                const result = await response.json();
+                const rawContent = result.choices?.[0]?.message?.content || '';
+
+                if (!rawContent) throw new Error('AI返回了空内容，请重试');
+
+                parsedComments = parseAIResponse(rawContent);
+
+                if (parsedComments.length === 0) {
+                    throw new Error('AI返回内容无法解析为评论，请重试。\n原始回复：' + rawContent.substring(0, 300));
+                }
+
+                document.getElementById('progress-card').classList.add('hidden');
+                displayComments();
+                showStatus(`🎉 成功生成 ${parsedComments.length} 条拟人化评论！`, 'success');
+
+            } catch (err) {
+                let errMsg = err.message || '未知错误';
+                if (errMsg.includes('timeout') || errMsg.includes('AbortError')) {
+                    errMsg = 'AI响应超时（120秒），请稍后重试';
+                } else if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || errMsg.includes('CORS')) {
+                    errMsg = '网络请求失败，可能是网络不通或API服务暂时不可用。请检查网络连接后重试。';
+                }
+                showStatus(`❌ ${errMsg}`, 'error');
+                document.getElementById('progress-card').classList.add('hidden');
+            } finally {
+                isGenerating = false;
+                btn.disabled = false;
+                btn.innerHTML = '🚀 一键生成评论';
+            }
+        }
+
+        // ========== 解析AI返回 ==========
+        function parseAIResponse(raw) {
+            raw = raw.trim();
+            
+            if (raw.includes('```')) {
+                const match = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+                if (match) raw = match[1].trim();
+            }
+
+            try {
+                const start = raw.indexOf('[');
+                const end = raw.lastIndexOf(']');
+                if (start !== -1 && end !== -1 && end > start) {
+                    const jsonStr = raw.substring(start, end + 1);
+                    const arr = JSON.parse(jsonStr);
+                    if (Array.isArray(arr) && arr.length > 0) {
+                        const valid = arr.filter(c => c && c.comment).map(c => ({
+                            comment: c.comment || '',
+                            persona: c.persona || '未知',
+                            angle: c.angle || '',
+                            type: c.type || '',
+                        }));
+                        if (valid.length > 0) return valid;
+                    }
+                }
+            } catch(e) {}
+
+            try {
+                const objs = raw.match(/\{[^{}]*?"comment"\s*:\s*"[^"]*?"[^{}]*?\}/g);
+                if (objs) {
+                    const valid = [];
+                    for (const objStr of objs) {
+                        try {
+                            const clean = objStr.replace(/,\s*}/g, '}');
+                            const c = JSON.parse(clean);
+                            if (c.comment) valid.push({
+                                comment: c.comment, persona: c.persona || '未知',
+                                angle: c.angle || '', type: c.type || ''
+                            });
+                        } catch(e) {}
+                    }
+                    if (valid.length > 0) return valid;
+                }
+            } catch(e) {}
+
+            try {
+                const comments = raw.match(/"comment"\s*:\s*"((?:[^"\\]|\\.)*)"/g);
+                const personas = raw.match(/"persona"\s*:\s*"((?:[^"\\]|\\.)*)"/g);
+                if (comments) {
+                    const valid = [];
+                    for (let i = 0; i < comments.length; i++) {
+                        const cm = comments[i].match(/"comment"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                        if (cm && cm[1].length > 5) {
+                            let persona = '未知';
+                            if (personas && personas[i]) {
+                                const pm = personas[i].match(/"persona"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                                if (pm) persona = pm[1];
+                            }
+                            valid.push({
+                                comment: cm[1].replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\'),
+                                persona: persona, angle: '', type: ''
+                            });
+                        }
+                    }
+                    if (valid.length > 0) return valid;
+                }
+            } catch(e) {}
+
+            const lines = raw.split('\n').filter(l => l.trim());
+            const comments = [];
+            for (const line of lines) {
+                const m = line.match(/^[\[（(]?(\d+)[）)\].]?\s*[.、:：]?\s*(.+)/);
+                if (m && m[2].length > 10) {
+                    comments.push({ comment: m[2].trim(), persona: '未知', angle: '', type: '' });
+                }
+            }
+            return comments;
+        }
+
+        // ========== 显示评论 ==========
+        function displayComments() {
+            const list = document.getElementById('comments-list');
+            const resultCard = document.getElementById('result-card');
+
+            if (parsedComments.length === 0) {
+                list.innerHTML = '<p style="color:#999">未能生成评论，请重试</p>';
+                resultCard.classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('result-count').textContent = `共生成 ${parsedComments.length} 条评论`;
+
+            list.innerHTML = parsedComments.map((c, i) => `
+                <div class="comment-item">
+                    <div class="comment-actions">
+                        <button class="btn-copy" onclick="copySingle(${i}, this)">复制</button>
+                    </div>
+                    <div class="comment-meta">
+                        <span class="comment-persona">${escapeHtml(c.persona || '未知')}</span>
+                        ${c.type ? `<span class="comment-type">${escapeHtml(c.type)}</span>` : ''}
+                        ${c.angle ? `<span class="comment-angle">${escapeHtml(c.angle)}</span>` : ''}
+                        <span>#${i + 1}</span>
+                    </div>
+                    <div class="comment-text">${escapeHtml(c.comment || '')}</div>
+                </div>
+            `).join('');
+
+            resultCard.classList.remove('hidden');
+            resultCard.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // ========== 复制功能 ==========
+        function copySingle(index, btn) {
+            const text = parsedComments[index].comment;
+            navigator.clipboard.writeText(text).then(() => {
+                btn.textContent = '✓ 已复制';
+                setTimeout(() => btn.textContent = '复制', 1200);
+            }).catch(() => {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                btn.textContent = '✓ 已复制';
+                setTimeout(() => btn.textContent = '复制', 1200);
+            });
+        }
+
+        function copyAllComments() {
+            const allText = parsedComments.map((c, i) => 
+                `[${i+1}] 人设：${c.persona}\n评论：${c.comment}`
+            ).join('\n\n');
+            navigator.clipboard.writeText(allText).then(() => {
+                showStatus(`✅ 已复制${parsedComments.length}条评论（含人设标注）`, 'success');
+            }).catch(() => fallbackCopy(allText));
+        }
+
+        function copyCommentsOnly() {
+            const allText = parsedComments.map(c => c.comment).join('\n\n');
+            navigator.clipboard.writeText(allText).then(() => {
+                showStatus(`✅ 已复制${parsedComments.length}条纯评论文本`, 'success');
+            }).catch(() => fallbackCopy(allText));
+        }
+
+        function fallbackCopy(text) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showStatus('✅ 已复制！', 'success');
+        }
+
+        // ========== 导出CSV ==========
+        function exportCSV() {
+            let csv = '\uFEFF编号,人设,角度,类型,评论内容\n';
+            parsedComments.forEach((c, i) => {
+                csv += `${i+1},"${c.persona || ''}","${c.angle || ''}","${c.type || ''}","${(c.comment || '').replace(/"/g, '""')}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `评论_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function regenerate() {
+            document.getElementById('result-card').classList.add('hidden');
+            oneClickGenerate();
+        }
+
+        // ========== AI配置 ==========
+        const PRESETS = {
+            siliconflow: { base: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-7B-Instruct' },
+            deepseek: { base: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+            openai: { base: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+            custom: { base: '', model: '' },
+        };
+
+        function applyPreset() {
+            const preset = PRESETS[document.getElementById('api-preset').value];
+            if (preset) {
+                if (preset.base) document.getElementById('api-base').value = preset.base;
+                if (preset.model) document.getElementById('model-name').value = preset.model;
+            }
+        }
+
+        function toggleKeyVisibility() {
+            const input = document.getElementById('api-key');
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+
+        function saveConfig() {
+            const apiBase = document.getElementById('api-base').value.trim();
+            const apiKey = document.getElementById('api-key').value.trim();
+            const model = document.getElementById('model-name').value.trim();
+
+            if (!apiKey) {
+                document.getElementById('config-status').textContent = '⚠️ 请填入API Key';
+                document.getElementById('config-status').style.color = '#e74c3c';
+                return;
+            }
+
+            setConfig({ api_base: apiBase, api_key: apiKey, model: model });
+            document.getElementById('config-status').textContent = '✅ 配置已保存！';
+            document.getElementById('config-status').style.color = '#10b981';
+            setTimeout(() => { document.getElementById('config-status').textContent = ''; }, 3000);
+        }
+
+        // ========== 工具 ==========
+        function showStatus(msg, type) {
+            const bar = document.getElementById('status-bar');
+            bar.className = `status-bar ${type}`;
+            bar.innerHTML = msg;
+            if (type === 'success') {
+                setTimeout(() => { bar.style.display = 'none'; }, 5000);
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+    </script>
+</body>
+</html>
